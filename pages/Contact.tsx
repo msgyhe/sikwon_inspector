@@ -1,19 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Section from '../components/Section';
-import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Loader2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbySrluQyG_tH39HWHCF90KkLVkel_wB4aUXA7blSpgzliOnXmBsK_usvTaST2l7lzb3/exec';
+
+interface FormData {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
 const Contact: React.FC = () => {
-  const [formState, setFormState] = useState<'idle' | 'submitting' | 'success'>('idle');
+  const [formState, setFormState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const { t } = useLanguage();
+  
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    email: '',
+    subject: t.contact.subjects[0] || '',
+    message: ''
+  });
+
+  useEffect(() => {
+    if (!document.getElementById('hidden_iframe')) {
+      const iframe = document.createElement('iframe');
+      iframe.id = 'hidden_iframe';
+      iframe.name = 'hidden_iframe';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormState('submitting');
-    // Simulate API call
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = GOOGLE_SCRIPT_URL;
+    form.target = 'hidden_iframe';
+
+    const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+    const fields: Record<string, string> = {
+      name: formData.name,
+      email: formData.email,
+      subject: formData.subject,
+      message: formData.message,
+      timestamp: timestamp
+    };
+
+    for (const key in fields) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = fields[key];
+      form.appendChild(input);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
     setTimeout(() => {
       setFormState('success');
-    }, 1500);
+      setFormData({
+        name: '',
+        email: '',
+        subject: t.contact.subjects[0] || '',
+        message: ''
+      });
+    }, 2000);
+  };
+
+  const handleReset = () => {
+    setFormState('idle');
+    setErrorMessage('');
   };
 
   return (
@@ -34,7 +107,6 @@ const Contact: React.FC = () => {
 
       <Section background="white" className="-mt-20 relative z-20">
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row">
-          {/* Info Side */}
           <div className="bg-navy text-white p-10 md:w-1/3 flex flex-col justify-between">
             <div>
               <h3 className="text-2xl font-bold mb-6">{t.contact.infoTitle}</h3>
@@ -78,7 +150,6 @@ const Contact: React.FC = () => {
             </div>
           </div>
 
-          {/* Form Side */}
           <div className="p-10 md:w-2/3 bg-white">
             {formState === 'success' ? (
               <div className="h-full flex flex-col items-center justify-center text-center py-20">
@@ -88,10 +159,24 @@ const Contact: React.FC = () => {
                 <h3 className="text-2xl font-bold text-navy mb-2">{t.contact.labels.success}</h3>
                 <p className="text-gray-600 mb-8">{t.contact.labels.successDesc}</p>
                 <button 
-                  onClick={() => setFormState('idle')}
+                  onClick={handleReset}
                   className="text-sky font-semibold hover:underline"
                 >
                   {t.contact.labels.reset}
+                </button>
+              </div>
+            ) : formState === 'error' ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle className="text-red-600 w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-bold text-navy mb-2">전송 실패</h3>
+                <p className="text-gray-600 mb-8">{errorMessage}</p>
+                <button 
+                  onClick={handleReset}
+                  className="text-sky font-semibold hover:underline"
+                >
+                  다시 시도하기
                 </button>
               </div>
             ) : (
@@ -102,8 +187,11 @@ const Contact: React.FC = () => {
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.name}</label>
                     <input 
                       type="text" 
-                      id="name" 
+                      id="name"
+                      name="name" 
                       required
+                      value={formData.name}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
                       placeholder={t.contact.placeholders.name}
                     />
@@ -112,8 +200,11 @@ const Contact: React.FC = () => {
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.email}</label>
                     <input 
                       type="email" 
-                      id="email" 
+                      id="email"
+                      name="email" 
                       required
+                      value={formData.email}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
                       placeholder={t.contact.placeholders.email}
                     />
@@ -122,20 +213,26 @@ const Contact: React.FC = () => {
                 <div>
                   <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.subject}</label>
                   <select 
-                    id="subject" 
+                    id="subject"
+                    name="subject" 
+                    value={formData.subject}
+                    onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
                   >
                     {t.contact.subjects.map((sub, idx) => (
-                      <option key={idx}>{sub}</option>
+                      <option key={idx} value={sub}>{sub}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.message}</label>
                   <textarea 
-                    id="message" 
+                    id="message"
+                    name="message" 
                     rows={5} 
                     required
+                    value={formData.message}
+                    onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all resize-none"
                     placeholder={t.contact.placeholders.message}
                   ></textarea>
