@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Section from '../components/Section';
 import { Mail, Phone, MapPin, Send, Loader2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 // Google Apps Script 웹앱 URL을 여기에 입력하세요
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxAKbanxewwVHackTDqfoaPOYBIWyodQTtZsUHyssRyoYaM4IDQWsOruzcSZSFmy8bQ/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbySrluQyG_tH39HWHCF90KkLVkel_wB4aUXA7blSpgzliOnXmBsK_usvTaST2l7lzb3/exec';
 
 interface FormData {
   name: string;
@@ -17,6 +17,8 @@ const Contact: React.FC = () => {
   const [formState, setFormState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const { t } = useLanguage();
+  const formRef = useRef<HTMLFormElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   
   // 폼 데이터 상태 관리
   const [formData, setFormData] = useState<FormData>({
@@ -28,53 +30,33 @@ const Contact: React.FC = () => {
 
   // 입력값 변경 핸들러
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { id, value } = e.target;
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [id]: value
+      [name]: value
     }));
   };
 
-  // 폼 제출 핸들러 - Google Sheets로 데이터 전송
-  const handleSubmit = async (e: React.FormEvent) => {
+  // 폼 제출 핸들러
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormState('submitting');
-    setErrorMessage('');
 
-    try {
-      // 타임스탬프 추가
-      const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    // hidden form으로 실제 제출
+    if (formRef.current) {
+      formRef.current.submit();
+    }
 
-      // URL 파라미터로 데이터 전송 (CORS 우회)
-      const params = new URLSearchParams({
-        name: formData.name,
-        email: formData.email,
-        subject: formData.subject,
-        message: formData.message,
-        timestamp: timestamp
-      });
-
-      await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`, {
-        method: 'GET',
-        mode: 'no-cors'
-      });
-
-      // no-cors 모드에서는 응답을 읽을 수 없으므로 성공으로 처리
+    // 일정 시간 후 성공 처리
+    setTimeout(() => {
       setFormState('success');
-      
-      // 폼 초기화
       setFormData({
         name: '',
         email: '',
         subject: t.contact.subjects[0] || '',
         message: ''
       });
-
-    } catch (error) {
-      console.error('Form submission error:', error);
-      setFormState('error');
-      setErrorMessage('문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
-    }
+    }, 2000);
   };
 
   // 폼 리셋
@@ -83,8 +65,33 @@ const Contact: React.FC = () => {
     setErrorMessage('');
   };
 
+  // 현재 타임스탬프
+  const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
   return (
     <div className="pt-20">
+      {/* Hidden iframe for form submission */}
+      <iframe 
+        ref={iframeRef}
+        name="hidden_iframe" 
+        style={{ display: 'none' }} 
+      />
+      
+      {/* Hidden form that actually submits to Google */}
+      <form 
+        ref={formRef}
+        action={GOOGLE_SCRIPT_URL}
+        method="POST"
+        target="hidden_iframe"
+        style={{ display: 'none' }}
+      >
+        <input type="hidden" name="name" value={formData.name} />
+        <input type="hidden" name="email" value={formData.email} />
+        <input type="hidden" name="subject" value={formData.subject} />
+        <input type="hidden" name="message" value={formData.message} />
+        <input type="hidden" name="timestamp" value={timestamp} />
+      </form>
+
       <div className="relative h-[400px] w-full bg-navy flex items-center justify-center">
         <img 
           src="https://imgur.com/VxulCAQ.jpeg" 
@@ -183,7 +190,8 @@ const Contact: React.FC = () => {
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.name}</label>
                     <input 
                       type="text" 
-                      id="name" 
+                      id="name"
+                      name="name" 
                       required
                       value={formData.name}
                       onChange={handleInputChange}
@@ -195,7 +203,8 @@ const Contact: React.FC = () => {
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.email}</label>
                     <input 
                       type="email" 
-                      id="email" 
+                      id="email"
+                      name="email" 
                       required
                       value={formData.email}
                       onChange={handleInputChange}
@@ -207,7 +216,8 @@ const Contact: React.FC = () => {
                 <div>
                   <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.subject}</label>
                   <select 
-                    id="subject" 
+                    id="subject"
+                    name="subject" 
                     value={formData.subject}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
@@ -220,7 +230,8 @@ const Contact: React.FC = () => {
                 <div>
                   <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.message}</label>
                   <textarea 
-                    id="message" 
+                    id="message"
+                    name="message" 
                     rows={5} 
                     required
                     value={formData.message}
