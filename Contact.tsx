@@ -6,6 +6,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 const Contact: React.FC = () => {
   const { t } = useLanguage();
 
+// 이 부분을 실제 URL로 변경해야 합니다
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlvzQmuxsBUp9ct-LinSaYU6gnMKwW0WQoKm72J4Oa1XsYy9T-tjZc8k1wdCef0PMJ/exec';
+
   return (
     <div className="pt-20">
       <div className="relative h-[400px] w-full bg-navy flex items-center justify-center">
