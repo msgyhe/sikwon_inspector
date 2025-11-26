@@ -3,6 +3,7 @@ import Section from '../components/Section';
 import { Mail, Phone, MapPin, Send, Loader2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
+
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbySrluQyG_tH39HWHCF90KkLVkel_wB4aUXA7blSpgzliOnXmBsK_usvTaST2l7lzb3/exec';
 
 interface FormData {
