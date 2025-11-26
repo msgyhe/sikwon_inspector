@@ -4,7 +4,7 @@ import { Mail, Phone, MapPin, Send, Loader2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 // Google Apps Script 웹앱 URL을 여기에 입력하세요
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlvzQmuxsBUp9ct-LinSaYU6gnMKwW0WQoKm72J4Oa1XsYy9T-tjZc8k1wdCef0PMJ/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxAKbanxewwVHackTDqfoaPOYBIWyodQTtZsUHyssRyoYaM4IDQWsOruzcSZSFmy8bQ/exec';
 
 interface FormData {
   name: string;
@@ -43,18 +43,20 @@ const Contact: React.FC = () => {
 
     try {
       // 타임스탬프 추가
-      const submitData = {
-        ...formData,
-        timestamp: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-      };
+      const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 
-      const response = await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors', // CORS 우회
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submitData)
+      // URL 파라미터로 데이터 전송 (CORS 우회)
+      const params = new URLSearchParams({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message,
+        timestamp: timestamp
+      });
+
+      await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`, {
+        method: 'GET',
+        mode: 'no-cors'
       });
 
       // no-cors 모드에서는 응답을 읽을 수 없으므로 성공으로 처리
