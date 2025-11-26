@@ -1,10 +1,85 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Section from '../components/Section';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Loader2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
+// Google Apps Script 웹앱 URL을 여기에 입력하세요
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlvzQmuxsBUp9ct-LinSaYU6gnMKwW0WQoKm72J4Oa1XsYy9T-tjZc8k1wdCef0PMJ/exec';
+
+interface FormData {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
 const Contact: React.FC = () => {
+  const [formState, setFormState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const { t } = useLanguage();
+  
+  // 폼 데이터 상태 관리
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    email: '',
+    subject: t.contact.subjects[0] || '',
+    message: ''
+  });
+
+  // 입력값 변경 핸들러
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+
+  // 폼 제출 핸들러 - Google Sheets로 데이터 전송
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormState('submitting');
+    setErrorMessage('');
+
+    try {
+      // 타임스탬프 추가
+      const submitData = {
+        ...formData,
+        timestamp: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+      };
+
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors', // CORS 우회
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData)
+      });
+
+      // no-cors 모드에서는 응답을 읽을 수 없으므로 성공으로 처리
+      setFormState('success');
+      
+      // 폼 초기화
+      setFormData({
+        name: '',
+        email: '',
+        subject: t.contact.subjects[0] || '',
+        message: ''
+      });
+
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setFormState('error');
+      setErrorMessage('문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  };
+
+  // 폼 리셋
+  const handleReset = () => {
+    setFormState('idle');
+    setErrorMessage('');
+  };
 
   return (
     <div className="pt-20">
@@ -24,6 +99,7 @@ const Contact: React.FC = () => {
 
       <Section background="white" className="-mt-20 relative z-20">
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row">
+          {/* Info Side */}
           <div className="bg-navy text-white p-10 md:w-1/3 flex flex-col justify-between">
             <div>
               <h3 className="text-2xl font-bold mb-6">{t.contact.infoTitle}</h3>
@@ -67,26 +143,107 @@ const Contact: React.FC = () => {
             </div>
           </div>
 
+          {/* Form Side */}
           <div className="p-10 md:w-2/3 bg-white">
-            <h3 className="text-2xl font-bold text-navy mb-4">{t.contact.formTitle}</h3>
-            <p className="text-gray-600 mb-6">
-              아래 버튼을 클릭하여 문의사항을 작성해주세요. 빠른 시일 내에 답변드리겠습니다.
-            </p>
-            
-            <a 
-              href="https://forms.gle/7E2zLfYHZpsEahDm8"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full bg-navy hover:bg-navy-800 text-white font-bold py-4 px-6 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
-            >
-              문의하기 <Send size={18} />
-            </a>
-            
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <strong>💡 Tip:</strong> 문의하신 내용은 이메일로 접수되며, 영업일 기준 1-2일 이내 답변드립니다.
-              </p>
-            </div>
+            {formState === 'success' ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                  <Send className="text-green-600 w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-bold text-navy mb-2">{t.contact.labels.success}</h3>
+                <p className="text-gray-600 mb-8">{t.contact.labels.successDesc}</p>
+                <button 
+                  onClick={handleReset}
+                  className="text-sky font-semibold hover:underline"
+                >
+                  {t.contact.labels.reset}
+                </button>
+              </div>
+            ) : formState === 'error' ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle className="text-red-600 w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-bold text-navy mb-2">전송 실패</h3>
+                <p className="text-gray-600 mb-8">{errorMessage}</p>
+                <button 
+                  onClick={handleReset}
+                  className="text-sky font-semibold hover:underline"
+                >
+                  다시 시도하기
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <h3 className="text-2xl font-bold text-navy mb-2">{t.contact.formTitle}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.name}</label>
+                    <input 
+                      type="text" 
+                      id="name" 
+                      required
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
+                      placeholder={t.contact.placeholders.name}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.email}</label>
+                    <input 
+                      type="email" 
+                      id="email" 
+                      required
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
+                      placeholder={t.contact.placeholders.email}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.subject}</label>
+                  <select 
+                    id="subject" 
+                    value={formData.subject}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all"
+                  >
+                    {t.contact.subjects.map((sub, idx) => (
+                      <option key={idx} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">{t.contact.labels.message}</label>
+                  <textarea 
+                    id="message" 
+                    rows={5} 
+                    required
+                    value={formData.message}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-sky focus:border-transparent outline-none transition-all resize-none"
+                    placeholder={t.contact.placeholders.message}
+                  ></textarea>
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={formState === 'submitting'}
+                  className="w-full bg-navy hover:bg-navy-800 text-white font-bold py-4 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {formState === 'submitting' ? (
+                    <>
+                      <Loader2 className="animate-spin" /> {t.contact.labels.sending}
+                    </>
+                  ) : (
+                    <>
+                      {t.contact.labels.send} <Send size={18} />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </Section>
